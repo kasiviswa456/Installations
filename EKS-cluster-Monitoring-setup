@@ -1,1 +1,182 @@
+1. Install kubectl
+sudo curl --silent --location -o /usr/local/bin/kubectl \
+  https://amazon-eks.s3.us-west-2.amazonaws.com/1.17.7/2020-07-08/bin/linux/amd64/kubectl
 
+sudo chmod +x /usr/local/bin/kubectl
+
+1.1: export PATH=/usr/local/bin/:$PATH
+1.2: source ~/.bash_profile
+
+2. Update awscli
+sudo pip install --upgrade awscli && hash -r
+
+3. Install jq, envsubst (from GNU gettext utilities) and bash-completion
+
+sudo yum -y install jq gettext bash-completion moreutils
+
+4. Install yq for yaml processing
+
+echo 'yq() {
+  docker run --rm -i -v "${PWD}":/workdir mikefarah/yq yq "$@"
+}' | tee -a ~/.bashrc && source ~/.bashrc
+
+4. Verify the binaries are in the path and executable
+
+for command in kubectl jq envsubst aws
+  do
+    which $command &>/dev/null && echo "$command in path" || echo "$command NOT FOUND"
+  done
+  
+  
+5. Enable kubectl bash_completion
+
+kubectl completion bash >>  ~/.bash_completion
+. /etc/profile.d/bash_completion.sh
+. ~/.bash_completion
+
+
+6. set the AWS ALB Ingress Controller version
+
+echo 'export ALB_INGRESS_VERSION="v1.1.8"' >>  ~/.bash_profile
+.  ~/.bash_profile
+
+7. Attach IAM Role to EC2 with administrator access
+
+8. To ensure temporary credentials aren’t already in place we will also remove any existing credentials file:
+
+rm -vf ${HOME}/.aws/credentials
+
+9. We should configure our aws cli with our current region as default.
+
+export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
+export AWS_REGION=$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')
+
+10. Check if AWS_REGION is set to desired region
+
+test -n "$AWS_REGION" && echo AWS_REGION is "$AWS_REGION" || echo AWS_REGION is not set
+
+11. Let’s save these into bash_profile
+
+echo "export ACCOUNT_ID=${ACCOUNT_ID}" | tee -a ~/.bash_profile
+echo "export AWS_REGION=${AWS_REGION}" | tee -a ~/.bash_profile
+aws configure set default.region ${AWS_REGION}
+aws configure get default.region
+
+12. Validate the IAM role
+
+aws sts get-caller-identity --query Arn | grep eksworkshop -q && echo "IAM role valid" || echo "IAM role NOT valid"
+
+13. Please run this command to generate SSH Key on Linux machine. This key will be used on the worker node instances to allow ssh access if necessary.
+
+ssh-keygen
+
+14. Upload the public key to your EC2 region:  (It will create Keypair)
+
+aws ec2 import-key-pair --key-name "eksworkshop" --public-key-material file://~/.ssh/id_rsa.pub
+
+{OR} If you got an error similar to An error occurred (InvalidKey.Format) when calling the ImportKeyPair operation: Key is not in valid OpenSSH public key format then you can try this command instead:
+
+aws ec2 import-key-pair --key-name "eksworkshop" --public-key-material fileb://~/.ssh/id_rsa.pub
+
+PREREQUISITES for EKS installation:
+
+15. For this module, we need to download the eksctl binary:
+
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+
+sudo mv -v /tmp/eksctl /usr/local/bin
+
+16. Confirm the eksctl command works:
+
+eksctl version
+
+17.  Enable eksctl bash-completion
+
+eksctl completion bash >> ~/.bash_completion
+. /etc/profile.d/bash_completion.sh
+. ~/.bash_completion
+
+18. Run aws sts get-caller-identity and validate that your Arn contains eksworkshop-adminand an Instance Id.
+
+19. cat << EOF > eksworkshop.yaml
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: eksworkshop-eksctl
+  region: ${AWS_REGION}
+  version: "1.17"
+
+availabilityZones: ["${AWS_REGION}a", "${AWS_REGION}b", "${AWS_REGION}c"]
+
+managedNodeGroups:
+- name: nodegroup
+  desiredCapacity: 3
+  ssh:
+    allow: true
+    publicKeyName: eksworkshop
+
+# To enable all of the control plane logs, uncomment below:
+# cloudWatch:
+#  clusterLogging:
+#    enableTypes: ["*"]
+
+EOF
+
+20. Next, use the file you created as the input for the eksctl cluster creation.
+
+eksctl create cluster -f eksworkshop.yaml
+
+22. Export the Worker Role Name for use throughout the workshop:
+
+STACK_NAME=$(eksctl get nodegroup --cluster eksworkshop-eksctl -o json | jq -r '.[].StackName')
+ROLE_NAME=$(aws cloudformation describe-stack-resources --stack-name $STACK_NAME | jq -r '.StackResources[] | select(.ResourceType=="AWS::IAM::Role") | .PhysicalResourceId')
+echo "export ROLE_NAME=${ROLE_NAME}" | tee -a ~/.bash_profile
+
+
+PIP installtions
+curl -O https://bootstrap.pypa.io/get-pip.py
+ python3 get-pip.py --user
+ 
+ export PATH=~/.local/bin:$PATH
+ source ~/.bash_profile
+  pip --version
+ 
+23. kubectl create namespace prometheus
+
+24. helm install prometheus stable/prometheus \
+    --namespace prometheus \
+    --set alertmanager.persistentVolume.storageClass="gp2" \
+    --set server.persistentVolume.storageClass="gp2"
+	--set service.type=LoadBalancer
+	
+25. Make note of the prometheus endpoint in helm response (you will need this later). It should look similar to below:
+
+The Prometheus server can be accessed via port 80 on the following DNS name from within your cluster:
+prometheus-server.prometheus.svc.cluster.local
+
+export POD_NAME=$(kubectl get pods --namespace prometheus -l "app=prometheus,component=server" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace prometheus port-forward $POD_NAME 9090
+
+The Prometheus alertmanager can be accessed via port 80 on the following DNS name from within your cluster:
+prometheus-alertmanager.prometheus.svc.cluster.local
+
+26. kubectl edit svc prometheus-server -n prometheus
+
+#change type = LoadBalancer
+
+27. kubectl get svc -n prometheus
+
+28. http://a4e29142a2b51463fac7d3238106d32b-896983688.us-east-1.elb.amazonaws.com/graph
+
+29. kubectl create namespace grafana
+helm install grafana stable/grafana \
+    --namespace grafana \
+    --set persistence.storageClassName="gp2" \
+    --set persistence.enabled=true \
+    --set adminPassword='admin123' \
+    --values grafana.yaml \
+    --set service.type=LoadBalancer
+30. export ELB=$(kubectl get svc -n grafana grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+31. echo "http://$ELB"
