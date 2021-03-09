@@ -1,8 +1,23 @@
-curl -L -C - -b "oraclelicense=accept-securebackup-cookie" -O http://download.oracle.com/otn-pub/java/jdk/11.0.1+13/90cf5d8f270a4347a95050320eef3fb7/jdk-11.0.1_linux-x64_bin.tar.gz
+# Remove java 7
+sudo yum remove -y java
 
-# wget --no-cookies --no-check-certificate --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/9.0.4+11/c2514751926b4512b076cc82f959763f/jdk-9.0.4_linux-x64_bin.tar.gz
+# Install basic packages
+sudo yum install -y git
 
-# tar -zxvf jdk-9.0.4_linux-x64_bin.tar.gz
+# Download and install java 8
+wget --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u131-b11/d54c1d3a095b4ff2b6607d096fa80163/jdk-8u131-linux-x64.tar.gz"
+tar -xzvf jdk-8u131-linux-x64.tar.gz
+rm -rf jdk-8u131-linux-x64.tar.gz
+
+# Configure JAVA_HOME
+sudo vim ~/.bashrc
+alias cls='clear'
+
+export JAVA_HOME=~/jdk1.8.0_131
+export JRE_HOME=~/jdk1.8.0_131/jre
+export PATH=$PATH:~/jdk1.8.0_131/bin:/~/jdk1.8.0_131/jre/bin
+source ~/.bashrc 
+java -version
 
 # cd jdk-9.0.4/
 # update-alternatives --install /usr/bin/java java /opt/java/jdk-9.0.4/bin/java 100  
@@ -14,9 +29,6 @@ curl -L -C - -b "oraclelicense=accept-securebackup-cookie" -O http://download.or
 # update-alternatives --install /usr/bin/jar jar /opt/java/jdk-9.0.4/bin/jar 100
 # update-alternatives --config jar
 
-# export JAVA_HOME=/opt/java/jdk-9.0.4/
-# export JRE_HOME=/opt/java/jdk-9.0.4/jre
-# export PATH=$PATH:/opt/java/jdk-9.0.4/bin:/opt/java/jdk-9.0.4/jre/bin
 
 
 Jenkins:
