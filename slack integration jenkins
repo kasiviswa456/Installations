@@ -1,0 +1,33 @@
+pipeline {
+  agent none
+  stages {
+    stage('Dev') {
+      parallel {
+        stage('Careate the Dic') {
+          agent {
+            node {
+              label 'Dev'
+            }
+
+          }
+          steps {
+            sh 'mkdir reddy'
+          }
+        }
+        stage('create the file') {
+          agent {
+            node {
+              label 'Dev'
+            }
+
+          }
+          steps {
+            sh 'touch reddy.txt'
+            slackSend channel: '#build', color: 'good', message: 'Build got success', teamDomain: 'viswanetwork', tokenCredentialId: 'jenkins-slack-token'
+          }
+        }
+      }
+    }
+  }
+}
+    
